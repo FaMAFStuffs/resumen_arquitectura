@@ -1,0 +1,172 @@
+\documentclass[12pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{enumerate}
+\usepackage[left=2cm,right=2cm,top=2cm,bottom=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{algpseudocode}
+\usepackage{stackrel}
+\renewcommand{\theequation}{\arabic{equation}}
+\newcounter{neq}
+\providecommand{\abs}[1]{\lvert#1\rvert}
+\newcommand{\QED}{\hfill \textit{\textbf{Q.E.D.}}}
+\author{Agustin Curto, agucurto95@gmail.com}
+\title{Resumen de teórico \\ Arquitectura de Computadores}
+\date{2016}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\chapter{El procesador}
+	\section{Descripción general de la segmentación}
+		\par La \textbf{Segmentación (\textit{pipelining})} es una técnica de implementación que consiste en solapar la ejecución de múltiples instrucciones. Utilizaremos una analogía para describir los términos básicos y las características principales de la segmentación.
+		\par Cualquiera que hay tenido que lavar grandes cantidades de ropa ha usado de forma intuitiva la segmentación. El enfoque no segmentado de hacer una colada sería:
+		\begin{enumerate}
+			\item Introducir ropa sucia en la lavadora.
+			\item Cuando finaliza el lavado, intruducir la ropa mojada en la secadora.
+			\item Cuando finaliza el secado, poner la ropa seca sobre una mesa para ordenarla y doblarla.
+			\item Una vez que toda la ropa está doblada, la misma es guardada.
+			\par Cuando ya se ha guardado, entonces se vuelve a comenzar con la siguiente colada.
+		\end{enumerate}
+
+		\par El enfoque segmentado de lavado requiere mucho menos tiempo, tal y como lo muestra la figura 1.1.
+
+		\begin{figure}[htb]
+			\centering
+			\includegraphics[width=8cm, height=6cm]{./imagenes/lavanderia.png}
+			\caption{La analogía con la lavandería.}
+		\end{figure}
+
+		\par Todos los pasos, denominados \textbf{etapas de segmentación}, se llevan a cabo en forma concurrente. Se podrán segmentar las tareas siempre y cuando se disponga de recursos separados para cada etapa.
+		\par La segmentación es más rápida para varias coladas ya que todas las etapas se llevan a cabo en paralelo, y por lo tanto se completan más coladas por hora. La segmentación mejora la productividad de la lavandería sin mejorar el tiempo necesario para realizar una colada. La segmentación no reducirá el tiempo para completar una colada pero si la mejora de la productividad reducirá el tiempo total para completar todo el trabajo.
+		\par Se consideran cinco pasos para ejecutar las instrucciones MIPS:
+		\begin{enumerate}
+			\item Buscar una instrucción en memoria. \textbf{\textit{fetch}}
+			\item Leer los registros mientras se decondifica la instrucción. El formato de las instrucciones MIPS permite que la lectura y la decodificación ocurran en forma simultánea. \textbf{\textit{decode}}
+			\item Ejecutar una operación o calcular una dirección de memoria. \textbf{\textit{execute}}
+			\item Acceder a un operando en la memoria de datos. \textbf{\textit{memory}}
+			\item Escribir el resultado en un registro. \textbf{\textit{write back}}
+		\end{enumerate}
+
+		\par Por lo tanto el cauce de segmentación, denominado \textit{pipeline}, en MIPS tiene cinco etapas. El siguiente ejemplo muestra que la segmentación acelera la ejecución de instrucciones del mismo modo que lo hace para la colada.
+
+			\subsubsection{Ejemplo}
+				\par Limitaremos nuestra atención a sólo ocho instrucciones: cargar palabra \textbf{\textit{lw}}, almacenar palabra \textbf{\textit{sw}}, sumar \textbf{\textit{add}}, restar \textbf{\textit{sub}}, y-lógico \textbf{\textit{and}}, o-lógico \textbf{\textit{or}}, activar si menor \textbf{\textit{set less than (slt)}}, saltar si es igual textbf{\textit{brach equal (beq)}}.
+				\par Compare el tiempo promedio entre la finalización de isntrucciones consecutivas en una implementación monociclo, en la que todas las instrucciones se ejecutan en un cíclo de reloj, con una implementación segmentada.
+				\par La figura 1.2 indica el tiempo requerido para cada una de las ocho instrucciones.
+
+				\begin{figure}[htb]
+					\centering
+					\includegraphics[width=8cm, height=3cm]{./imagenes/tiempo.png}
+					\caption{Tiempo total para cada instrucción calculado a parir del tiempo de cada componente.}
+				\end{figure}
+
+			\par El diseño monocilco debe permitir acomodar a la instrucción más lenta, que en la figura 1.2 es \textit{lw}, y por lo tanto la duración de todas las instrucciones será de 800 ps.
+			\par La figura 1.3 compara las ejecuciones segmentadas y no segmentadas de tres instrucciones \textit{lw}.
+
+			\begin{figure}[htb]
+				\centering
+				\includegraphics[width=10cm, height=7cm]{./imagenes/lw.png}
+				\caption{La analogía con la lavandería.}
+			\end{figure}
+			\pagebreak
+
+			\par Es posible convertir en una fórmula la discusión anterior sobre la ganacia de la segmentación. Si las etapas están perfectamente equilibradas, entonces el tiempo entre las instrucciones en el procesador segmentado, suponiendo condiciones ideales, es igual a:
+
+			\[
+				Tiempo \; entre \; Instrucciones_{segmentado} = \frac{Tiempo \; entre \; instrucciones_{no \; segmentado}}{Numero \; de \; etapas \; de \; segmentacion}
+			\]
+
+			\par En condiciones ideales y con una gran número de isntrucciones, la ganancia debida a la segmentación es aproximadamente igual al número de etapas; un \textit{pipeline} de cinco etapas es casi cinco veces más rápido.
+
+		\subsection{Diseño de repertorios de instrucciones para la segmentación}
+			\begin{enumerate}
+				\item Todas las instrucciones MIPS tiene la misma longitud
+				\item MIPS tiene solo unos pocos formatos de instrucciones, y además en todos ellos los campos de los registros fuentes están situados siempre en la misma posición de la instrucción.
+				\item En MIPS los operandos a memoria sólo aparecen en instrucciones de carga y almacenamiento.
+				\item Los operandos deben estar alineados en memoria.
+			\end{enumerate}
+
+		\subsection{Riesgos del pipeline}
+			\par Hay situaciones de segmentación en las que la instrucción siguiente no se puede ejecutar en el siguiente ciclo. Estos sucesos se llaman \textit{riesgos} (\textbf{hazards}) y existen tres tipos:
+
+			\subsubsection{Riesgos estructurales}
+				\par El hardware no admite una cierta combinación de instrucciones durante el mismo ciclo. En el ejemplo de la lavandería ocurriría si se usara una combinación lavadora-secadora en lugar de tener la lavadora y la secadora separadas.
+				\par El repertorio de instrucciones el MIPS fue diseñado para ser segmentado,
+	por lo que facilita a los diseñadores evitar \textit{riesgos estructurales}. Supongamos, sin embargo, que se tuviera una sola memoria en lugar de dos. Si el \textit{pipeline} de la Figura 1.3 tuviera una cuarta instrucción, se vería que en un mismo ciclo la primera instrucción está accediendo a datos de la memoria mientras que la cuarta está buscando una instrucción de la misma memoria. Sin disponer de dos memorias, nuestra segmentación podría tener riesgos estructurales.
+
+			\subsubsection{Riesgos de datos}
+				\par Ocurren cuando el \textit{pipeline} se debe bloquear debido a que un paso de ejecución debe esperar a que otro paso sea completado.
+				\par Volviendo a la lavandería, supongamos que se esta doblando una colada y no se encuentra la pareja de un calcetín.
+				\par En un \textit{pipeline} del computador, los riesgos de datos surgen de las dependencias entre una instrucción y otra anterior que se encuentra todavía en el \textit{pipeline}. Por ejemplo, suponer que se tiene una instrucción \textit{add} seguida inmediantamente por una instrucción \textit{sub} que utiliza el resultado de la suma:
+				\begin{center}
+					\textit{add} \qquad \$s0, \$t0, \$t1 \\
+					\textit{sub} \qquad \$t2, \$s0, \$t3
+				\end{center}
+
+				\par Si no se interviene, un riesgo de datos puede bloquear severamente el procesador. la instrucción \textit{add} no escribe su resultado hasta la quinta etapa, por lo que se tendrían que añadir tres burbujas en el procesador.
+				\par La principal solución se basa en la observación de que no es necesario esperar a que la instrucción se complete antes de intentar resolver el reigo de datos. Para la secuencia de código anterior, tan pronto como la ALU calcula la suma para la instrucción \textit{add}, se puede suministrar el resultado como entrada para la resta. Se denomina \textbf{anticipación de resultados (forwarding)} o \textbf{retroalimentación (by passing)} al uso de hardware extra para anticipar antes el dato buscado usando los recursos internos del procesador.
+
+				\begin{figure}[htb]
+					\centering
+					\includegraphics[width=10cm, height=5cm]{./imagenes/datos.png}
+					\caption{Representación gráfica de la anticipación de datos.}
+				\end{figure}
+
+				\par La anticipación funciona muy bien pero no es capaz de evitar todos los bloques. Por ejemplo, suponer que la primera instrucción fuera una carga en \$s0, en lugar de una suma. Como se puede deducira partir de una mirada de la figura 1.4, el dato deseado sólo estará disponible después de la cuarta etapa de la primera instrucción, lo cual es demasiado tarde para la entrada de la etapa EX de la instrucción \textit{sub}. Por lo tanto, incluso con la anticipación de resultados, habría que bloquear en una etapa en el caso del \textbf{riesgo del dato de carga (\textit{load-use data hazard})}, tal como se puede ver en la figura 1.5. Esta figura muestra un importante concepto de la segmentación, oficialmente denominado un \textbf{bloqueo del \textit{pipeline} (\textit{pipeline stall})}, pero que frecuentemente recibe el apodo de \textbf{burbúja} (\textit{bubble}).
+
+				\begin{figure}[htb]
+					\centering
+					\includegraphics[width=10cm, height=5cm]{./imagenes/bubble.png}
+					\caption{Representación gráfica de la anticipación de datos con burbújas.}
+				\end{figure}
+
+				\par La anticipación de resultado conlleva otra característica que hace comprender la arquitectura MIPS. Cada instrucción MIPS escribe como mucho un resultado y lo hace cerca del final del pipeline. La anticipación de resultado es más complicada si hay múltiples resultados que avanzar por cada instrucción, o si se necesita escribir el resultado antes del final de la ejecución de la instrucción.
+
+				\par \textbf{Ejemplo:} Supongamos que tenemos el siguiente código MIPS, suponiendo que todas las variables estáne ne memoria y son direccionables como desplazamientos a partes de \$t0:
+				\begin{center}
+					\textit{lw} \qquad \$t1, 0(\$t0) \\
+					\textit{lw} \qquad \$t2, 4(\$t0) \\
+					\textit{add} \qquad \$t3, \$t1, \$t2 \\
+					\textit{sw} \qquad \$t3, 12(\$t0) \\
+					\textit{lw} \qquad \$t4, 8(\$01) \\
+					\textit{add} \qquad \$t5, \$t1, \$t4 \\
+					\textit{sw} \qquad \$t5, 16(\$t0)
+				\end{center}
+
+				\par Encuentre los riesgos que existen en el segmento de código y reordene las instrucciones para evitar todos los bloqueos del \textit{pipeline}.
+
+				\par \textbf{Respuesta:} Las dos instrucciones add tienen un riesgo debido a sus respectivas dependencias con la instrucción lw que les precede inmediatamente. Observe que la anticipación de datos elimina muchos otros riesgos potenciales, incluidos la dependencia del primer add con el primer lw y los riesgos con las instrucciones store. Mover hacia a rriba la tercera instrucción lw elimina ambos riegos.
+				\begin{center}
+					\textit{lw} \qquad \$t1, 0(\$t0) \\
+					\textit{lw} \qquad \$t2, 4(\$t0) \\
+					\textit{lw} \qquad \$t4, 8(\$01) \\
+					\textit{add} \qquad \$t3, \$t1, \$t2 \\
+					\textit{sw} \qquad \$t3, 12(\$t0) \\
+					\textit{add} \qquad \$t5, \$t1, \$t4 \\
+					\textit{sw} \qquad \$t5, 16(\$t0)
+				\end{center}
+				
+				\par En un procesador segmentado con anticipación de resultados, la secuencia reordenada se completará en dos cilcos menos que la versión original.
+
+			\subsubsection{Riesgos de control}
+				\par
+
+		\subsection{Resumen de la visión general del \textit{pipeline}}
+
+	\section{Camino de datos segmentados y control de la segmentación}
+
+	\section{Riesgos de datos: anticipación frente a bloqueos}
+
+	\section{Riesgos de control}
+
+\chapter{Memoria}
+
+
+\end{document}
